@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WD Swim — WhatsApp trial agent demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --deck:#E6ECEE; --panel:#FFFFFF; --lane:#0A4A6E; --tile:#5FC4D8; --rope:#C4382B;
+    --ink:#1C2B33; --muted:#5B6B73; --grid:#D4DADD; --head:#F3F5F6;
+    --chat:#EFE7DD; --mine:#D9FDD3; --theirs:#FFFFFF; --event:#DDF3F7; --err:#FDE2DF; --errink:#8A2219;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --deck:#0E1A20; --panel:#152430; --lane:#7FD4E6; --tile:#2A6C85; --rope:#F08C80;
+      --ink:#E8F0F3; --muted:#9BB0B9; --grid:#27404E; --head:#1B2E3A;
+      --chat:#132029; --mine:#194D3C; --theirs:#1D2F3B; --event:#153B49; --err:#4A1C17; --errink:#FFC9C2;
+    }
+  }
+  :root[data-theme="dark"]{
+    --deck:#0E1A20; --panel:#152430; --lane:#7FD4E6; --tile:#2A6C85; --rope:#F08C80;
+    --ink:#E8F0F3; --muted:#9BB0B9; --grid:#27404E; --head:#1B2E3A;
+    --chat:#132029; --mine:#194D3C; --theirs:#1D2F3B; --event:#153B49; --err:#4A1C17; --errink:#FFC9C2;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--deck);color:var(--ink);font-family:"Nunito Sans",-apple-system,"Segoe UI",system-ui,sans-serif;padding:20px}
+  h1{color:var(--lane);font-size:clamp(22px,4vw,30px);margin:0;letter-spacing:-.01em}
+  .wrap{max-width:1080px;margin:0 auto}
+  header{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-end;margin-bottom:22px}
+  header p{margin:8px 0 0;max-width:560px;line-height:1.5;font-size:15px}
+  .cols{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start}
+  .phone{background:var(--ink);border-radius:34px;padding:10px;width:100%;max-width:390px;margin:0 auto;flex-shrink:0}
+  .screen{border-radius:26px;overflow:hidden;background:var(--chat);height:620px;display:flex;flex-direction:column}
+  .bar{background:var(--lane);color:#fff;display:flex;gap:12px;align-items:center;padding:12px 16px}
+  :root:not([data-theme="light"]) .bar{color:#07242F}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .bar{color:#07242F}}
+  .av{width:38px;height:38px;border-radius:99px;background:var(--tile);display:grid;place-items:center;font-weight:700;color:#0A4A6E}
+  .log{flex:1;overflow-y:auto;padding:16px 12px;display:flex;flex-direction:column;gap:8px}
+  .b{max-width:82%;border-radius:12px;padding:8px 12px;font-size:14.5px;line-height:1.45;box-shadow:0 1px 0 rgba(0,0,0,.12);unicode-bidi:plaintext;white-space:pre-wrap}
+  .me{align-self:flex-end;background:var(--mine)}
+  .them{align-self:flex-start;background:var(--theirs)}
+  .t{font-size:10.5px;color:var(--muted);text-align:right;margin-top:3px}
+  .ev{align-self:center;font-size:12px;background:var(--event);color:var(--lane);border-radius:8px;padding:4px 12px;font-weight:600;text-align:center}
+  .ev.bad{background:var(--err);color:var(--errink)}
+  .compose{display:flex;gap:8px;padding:8px;background:var(--head)}
+  .compose input{flex:1;border:none;border-radius:99px;padding:10px 16px;font:inherit;font-size:15px;background:var(--panel);color:var(--ink)}
+  .rnd{width:40px;height:40px;border-radius:99px;border:none;font-size:16px;cursor:pointer;background:var(--panel);color:var(--ink)}
+  .rnd.go{background:var(--lane);color:var(--panel)}
+  .rnd:disabled{opacity:.5;cursor:default}
+  .start{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:10px 14px;font:inherit;font-size:14px;text-align:left;cursor:pointer;color:var(--ink)}
+  .side{flex:1;min-width:320px;display:flex;flex-direction:column;gap:22px}
+  .card{background:var(--panel);border:1px solid var(--grid);border-radius:10px;overflow:hidden}
+  .card h2{margin:0;font-size:15px}
+  .cardhead{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--grid)}
+  .scroll{overflow-x:auto}
+  table{border-collapse:collapse;font-size:12.5px;min-width:1250px;width:100%}
+  th,td{border:1px solid var(--grid);padding:6px 8px;text-align:left;vertical-align:top;white-space:nowrap;max-width:210px}
+  th{background:var(--head);font-weight:700}
+  td.wrap{white-space:normal}
+  .rn{background:var(--head);color:var(--muted);text-align:center;width:34px}
+  .status{color:var(--rope);font-weight:700}
+  @keyframes lap{from{background:#FFF1B8;color:#1C2B33}to{background:transparent}}
+  tr.fresh td{animation:lap 2.4s ease-out}
+  .mail{display:flex;flex-wrap:wrap}
+  .mlist{flex:1 1 220px;border-right:1px solid var(--grid)}
+  .mlist button{display:block;width:100%;text-align:left;padding:12px 16px;border:none;border-bottom:1px solid var(--grid);background:var(--panel);color:var(--ink);font:inherit;cursor:pointer}
+  .mlist button[aria-current="true"]{background:var(--event)}
+  .mbody{flex:2 1 300px;padding:16px 20px}
+  .mbody pre{font:inherit;white-space:pre-wrap;line-height:1.55;margin:12px 0 0}
+  .empty{padding:18px 16px;color:var(--muted);font-size:14px;margin:0}
+  .ghost{border:2px solid var(--lane);color:var(--lane);background:transparent;border-radius:999px;padding:9px 18px;font:inherit;font-weight:700;cursor:pointer}
+  button:focus-visible,input:focus-visible{outline:3px solid var(--tile);outline-offset:2px}
+  .dots span{display:inline-block;width:7px;height:7px;border-radius:9px;background:var(--muted);animation:bl 1.2s infinite}
+  .dots span:nth-child(2){animation-delay:.2s}.dots span:nth-child(3){animation-delay:.4s}
+  @keyframes bl{0%,80%,100%{opacity:.25}40%{opacity:1}}
+  @media (prefers-reduced-motion:reduce){tr.fresh td,.dots span{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>WD Swim — free trial agent demo</h1>
+      <p>You're the parent. Message the assistant on the left and watch the lead land in the leads sheet and the staff inbox. The chat is real; the sheet and inbox are a simulation.</p>
+    </div>
+    <button class="ghost" id="reset">Start over</button>
+  </header>
+
+  <div class="cols">
+    <section class="phone" aria-label="WhatsApp chat">
+      <div class="screen">
+        <div class="bar">
+          <div class="av">WD</div>
+          <div>
+            <div style="font-weight:700;font-size:15px">WD Swim Richmond Hill</div>
+            <div style="font-size:12px;opacity:.85" id="sub">Business account</div>
+          </div>
+        </div>
+        <div class="log" id="log" aria-live="polite"></div>
+        <div class="compose">
+          <input id="msg" dir="auto" placeholder="Message" aria-label="Type a message">
+          <button class="rnd" id="mic" title="Send a voice message" aria-label="Send a voice message">🎤</button>
+          <button class="rnd go" id="send" aria-label="Send">➤</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="side">
+      <section class="card" aria-label="Leads sheet">
+        <div class="cardhead"><h2>WD Swim Trial Leads</h2><span style="font-size:13px;color:var(--muted)" id="count">0 leads</span></div>
+        <div class="scroll"><table><thead><tr id="hrow"><th class="rn">1</th></tr></thead><tbody id="tbody"></tbody></table></div>
+      </section>
+
+      <section class="card" aria-label="Staff inbox">
+        <div class="cardhead"><h2>Staff inbox</h2><span style="font-size:13px;color:var(--muted)" id="ecount">0 new</span></div>
+        <div id="mailwrap"><p class="empty">Each confirmed lead is emailed here so the front desk can book it in iClassPro.</p></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+const PARENT = { name: "Sara M.", number: "14165550182" };
+const COLS = ["Timestamp","WhatsApp Number","WhatsApp Name","Parent Name","Child Full Name","Child Age","Date of Birth","Gender","Swim Experience","Preferred Time 1","Preferred Time 2","Preferred Time 3","Heard About Us","Notes","Status"];
+const PROMPT_TEMPLATE = "You are the WhatsApp booking assistant for WD Swim Richmond Hill, a swim school in Richmond Hill, Ontario. Your job is to qualify new leads and collect a trial lesson request. The WD Swim team will then pick the best class and book it in iClassPro.\n\nCurrent date and time (Toronto): __NOW__\nParent WhatsApp display name: __PARENT__\n\n## Age eligibility\n- WD Swim teaches swimmers aged 3 to 17.\n- Exception: if the child is 2 years old (or the parent says \"almost 3\" or similar), ask how many months past 2 they are. If they are 2 years and 10 or 11 months, accept them: record the age as, for example, \"2 years 10 months\" and add \"Under 3, turning 3 soon\" to notes. If they are 2 years and 9 months or younger, treat them as not eligible.\n- Not eligible (under 2 years 10 months, or 18 or older): kindly explain that lessons are for ages 3 to 17, do not submit a lead for that swimmer, and ask whether there is another child aged 3 to 17 they'd like to book for. For young children, invite the parent to reach out again once the child is close to 3.\n\n## Operating hours (Toronto time)\n- Monday to Friday: 3:45 PM to 9:00 PM\n- Saturday: 9:00 AM to 7:00 PM\n- Sunday: 8:45 AM to 5:00 PM\n- After-hours lessons are also offered on some days. You do not know which days or times.\nYou may share these hours if asked. If a preferred time falls outside regular hours, do not reject it: tell the parent it's outside regular hours, that after-hours lessons are available on some days, and that the team will check. Keep that time and add \"(after hours)\" to it in the lead. Vague answers like \"weekends\" are not enough: ask for a day and an approximate time.\n\n## Languages\n- In your first message, let the parent know they can chat in English, Mandarin (\u666e\u901a\u8bdd), Cantonese (\u5ee3\u6771\u8a71) or Farsi (\u0641\u0627\u0631\u0633\u06cc).\n- Mandarin: reply in Simplified Chinese.\n- Cantonese: reply in Traditional Chinese using natural written Cantonese (for example \u4fc2, \u5514, \u5605, \u4f60\u54cb, \u5e7e\u591a).\n- Farsi: reply in Persian script, warm and polite, using the respectful \u0634\u0645\u0627 form. If the parent writes Farsi in Latin letters (Finglish), you may reply in Finglish too.\n- Match the parent's language and dialect. If they write Chinese and it's unclear whether they prefer Mandarin or Cantonese, ask. If they write in any other language, reply in that language.\n- Always write lead details (the \"leads\" array) in English so staff can read them. Keep the child's name as given, and add the English or romanized name too if the parent provides it. Put the chat language in notes (for example: Chat language: Farsi).\n\n## Conversation flow\nThis mirrors the WD Swim free trial phone script, adapted for WhatsApp.\n1. Greet warmly: introduce yourself as the WD Swim Richmond Hill booking assistant, thank them for their interest in our classes, mention the language options, and ask how many children they'd like to book a free trial for.\n2. Then ask ONE question at a time, in this order, skipping anything the parent already told you. If they are booking for more than one child, collect a) to d) for each child, one child at a time.\n   a) Child's full name\n   b) Child's age (check eligibility right away; for 2-year-olds ask the months)\n   c) Child's gender\n   d) Previous swim experience. Offer these simple options: 1) New to the water / nervous, 2) Comfortable in the water but can't swim on their own yet, 3) Can swim a few metres on their own, 4) Can swim a full length or has had lessons before (if so, ask where and what level).\n3. Ask what times are best for a trial: their top 3 preferred days and times, and whether weekdays or weekends suit them better (for example: Saturday 10am, Tuesday after 5pm, Sunday afternoon). If they give fewer than 3, ask once for more options; if they can't, accept what they gave.\n4. Ask for the parent's full name (the account holder for the registration).\n5. Ask for each child's date of birth, needed to finish the registration.\n6. Ask how they heard about us, offering: Instagram, Google Maps, or friend/family.\n7. Send a short summary (parent name, and for each child: full name, age, gender, experience, date of birth, plus the preferred times) and ask them to confirm it's correct.\n8. In the turn where they confirm, submit the lead by adding it to the \"leads\" array (one object per child). That is what saves it to the sheet and emails it to staff. If any preferred time is after hours, add \"After-hours request\" to notes.\n9. In that same turn, thank them for their time and information, recap what was sent to the team, and tell them a WD Swim team member will check availability and message them here shortly to confirm the trial date and time.\n\n## Rules\n- Do not ask for the parent's email address or phone number. The team already has their WhatsApp number.\n- NEVER offer, suggest, list or confirm specific class times, schedules or availability, including which days have after-hours lessons. You only know the regular operating hours, not the class schedule. If the parent asks what classes are available, say the team will check availability and confirm.\n- NEVER say the trial is booked or confirmed, and never promise a confirmation email or a specific date and time. You only submit a request; staff finalize it in iClassPro.\n- Keep messages short and friendly, WhatsApp-style: 1 to 4 sentences, no headers or markdown tables. You may use *bold* sparingly (single asterisks).\n- Multiple children: submit one lead per child. Ask for the parent's name and referral source only once; reuse them for every sibling.\n- Never invent prices, policies, addresses or instructor names. For questions you can't answer, say a team member will follow up, and include the question in notes.\n- If the parent asks to speak to a person, submit the lead with what you have, put 'Requested a call' in notes, and tell them the team will reach out.\n- Never ask for payment details, card numbers or passwords.\n- If a message is off-topic, politely steer back to booking a free trial.\n\n## Output format (strict)\nRespond with ONLY a JSON object. No code fences, no text before or after it:\n{\"reply\": \"<the WhatsApp message to the parent>\", \"leads\": []}\n- \"leads\" stays an empty array except in the single turn where the parent confirms their summary (or asks for a person). In that turn add one object per child:\n  {\"parent_name\": \"\", \"child_full_name\": \"\", \"child_age\": \"\", \"date_of_birth\": \"\", \"gender\": \"\", \"swim_experience\": \"\", \"preferred_time_1\": \"\", \"preferred_time_2\": \"\", \"preferred_time_3\": \"\", \"heard_about_us\": \"\", \"notes\": \"\"}\n- Never resubmit a lead you already submitted in an earlier turn.\n- \"reply\" is plain WhatsApp text only. Never put code, JSON or function calls inside it.\n\n## Rules\n- Do not ask for the parent's email address or phone number. The team already has their WhatsApp number.\n- NEVER offer, suggest, list or confirm specific class times, schedules or availability, including which days have after-hours lessons. You only know the regular operating hours, not the class schedule. If the parent asks what classes are available, say the team will match them to the best available class based on their preferred times.\n- NEVER say the trial is booked or confirmed. You only submit a request; staff finalize it in iClassPro.\n- Keep messages short and friendly, WhatsApp-style: 1 to 4 sentences, no headers or markdown tables. You may use *bold* sparingly (single asterisks).\n- Multiple children: collect each eligible child's details and submit one lead per child.\n- Never invent prices, policies, addresses or instructor names. For questions you can't answer, say a team member will follow up, and include the question in Notes.\n- If the parent asks to speak to a person, submit the lead with what you have, put 'Requested a call' in Notes, and tell them the team will reach out.\n- Never ask for payment details, card numbers or passwords.\n- If a message is off-topic, politely steer back to booking a trial.";
+const STARTER = "I want to book a free trial lesson";
+
+const tz = (o) => new Intl.DateTimeFormat("en-CA", Object.assign({timeZone:"America/Toronto"}, o)).format(new Date());
+const clock = () => tz({hour:"2-digit",minute:"2-digit",hour12:false});
+const stamp = () => tz({year:"numeric",month:"2-digit",day:"2-digit"}) + " " + clock();
+const buildPrompt = () => PROMPT_TEMPLATE
+  .replace("__NOW__", tz({weekday:"long",month:"long",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"}))
+  .replace("__PARENT__", PARENT.name);
+
+let history = [], rows = [], emails = [], openEmail = 0, busy = false;
+
+const $ = (id) => document.getElementById(id);
+const log = $("log");
+
+function esc(s){ return String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function bold(s){ return esc(s).replace(/\*([^*\n]+)\*/g, "<strong>$1</strong>"); }
+
+function bubble(who, text){
+  const d = document.createElement("div");
+  d.className = "b " + (who === "me" ? "me" : "them");
+  d.setAttribute("dir","auto");
+  d.innerHTML = bold(text) + '<div class="t">' + clock() + (who === "me" ? " ✓✓" : "") + "</div>";
+  log.appendChild(d); log.scrollTop = log.scrollHeight;
+  return d;
+}
+function event(text, bad){
+  const d = document.createElement("div");
+  d.className = "ev" + (bad ? " bad" : "");
+  d.textContent = (bad ? "" : "✓ ") + text;
+  log.appendChild(d); log.scrollTop = log.scrollHeight;
+}
+function typing(on){
+  busy = on; $("send").disabled = on; $("msg").disabled = on; $("mic").disabled = on;
+  $("sub").textContent = on ? "typing…" : "Business account";
+  const old = document.getElementById("typing");
+  if (old) old.remove();
+  if (on){
+    const d = document.createElement("div");
+    d.id = "typing"; d.className = "b them dots";
+    d.innerHTML = "<span></span><span></span><span></span>";
+    log.appendChild(d); log.scrollTop = log.scrollHeight;
+  }
+}
+
+function renderSheet(fresh){
+  const hrow = $("hrow");
+  hrow.innerHTML = '<th class="rn">1</th>' + COLS.map(c => "<th>" + esc(c) + "</th>").join("");
+  const tb = $("tbody");
+  $("count").textContent = rows.length + (rows.length === 1 ? " lead" : " leads");
+  if (!rows.length){
+    tb.innerHTML = '<tr><td class="rn">2</td><td class="wrap" colspan="' + COLS.length + '" style="color:var(--muted)">New rows appear here once the parent confirms their details.</td></tr>';
+    return;
+  }
+  tb.innerHTML = rows.map((r,i) =>
+    '<tr class="' + (i === fresh ? "fresh" : "") + '"><td class="rn">' + (i+2) + "</td>" +
+    COLS.map(c => '<td class="' + (c === "Notes" || c === "Swim Experience" ? "wrap" : "") + (c === "Status" ? " status" : "") + '">' + esc(r[c] || "") + "</td>").join("") + "</tr>"
+  ).join("");
+}
+
+function renderMail(){
+  $("ecount").textContent = emails.length + " new";
+  const w = $("mailwrap");
+  if (!emails.length){ w.innerHTML = '<p class="empty">Each confirmed lead is emailed here so the front desk can book it in iClassPro.</p>'; return; }
+  w.className = "mail";
+  w.innerHTML =
+    '<div class="mlist">' + emails.map((e,i) =>
+      '<button data-i="' + i + '" aria-current="' + (i === openEmail) + '"><div style="display:flex;justify-content:space-between;gap:8px;font-size:13px"><span style="font-weight:700">WD Swim WhatsApp Assistant</span><span style="color:var(--muted)">' + e.time + '</span></div><div style="font-size:13.5px">' + esc(e.subject) + "</div></button>"
+    ).join("") + "</div>" +
+    '<div class="mbody"><h2 style="color:var(--lane);font-size:17px;margin:0">' + esc(emails[openEmail].subject) + '</h2><p style="font-size:12.5px;color:var(--muted);margin:4px 0 0">From WD Swim WhatsApp Assistant to the front desk</p><pre>' + esc(emails[openEmail].body) + "</pre></div>";
+  w.querySelectorAll("button").forEach(b => b.onclick = () => { openEmail = +b.dataset.i; renderMail(); });
+}
+
+function submitLead(i){
+  const row = {
+    "Timestamp": stamp(),
+    "WhatsApp Number": PARENT.number,
+    "WhatsApp Name": PARENT.name,
+    "Parent Name": i.parent_name || "",
+    "Child Full Name": i.child_full_name || "",
+    "Child Age": i.child_age || "",
+    "Date of Birth": i.date_of_birth || "",
+    "Gender": i.gender || "",
+    "Swim Experience": i.swim_experience || "",
+    "Preferred Time 1": i.preferred_time_1 || "",
+    "Preferred Time 2": i.preferred_time_2 || "",
+    "Preferred Time 3": i.preferred_time_3 || "",
+    "Heard About Us": i.heard_about_us || "",
+    "Notes": i.notes || "",
+    "Status": "New - book in iClassPro"
+  };
+  rows.push(row);
+  renderSheet(rows.length - 1);
+  const summary = [
+    "Parent: " + row["Parent Name"],
+    "Child: " + row["Child Full Name"],
+    "Age: " + row["Child Age"],
+    "Date of birth: " + (row["Date of Birth"] || "-"),
+    "Gender: " + (row["Gender"] || "-"),
+    "Swim experience: " + row["Swim Experience"],
+    "Preferred time 1: " + (row["Preferred Time 1"] || "-"),
+    "Preferred time 2: " + (row["Preferred Time 2"] || "-"),
+    "Preferred time 3: " + (row["Preferred Time 3"] || "-"),
+    "Heard about us: " + (row["Heard About Us"] || "-"),
+    "Notes: " + (row["Notes"] || "-")
+  ].join("\n");
+  emails.unshift({
+    subject: "New WhatsApp free trial lead: " + (row["Child Full Name"] || "Unknown"),
+    time: clock(),
+    body: "New free trial lead from WhatsApp - please check availability, create the profile and book the trial in iClassPro.\n\nParent WhatsApp: +" + PARENT.number + " (" + PARENT.name + ")\n\n" + summary + "\n\nThis lead is also in the Trial Leads tab of the WD Swim Trial Leads sheet."
+  });
+  openEmail = 0; renderMail();
+  event("Lead saved to sheet and emailed to staff: " + row["Child Full Name"]);
+}
+
+function starter(){
+  const box = document.createElement("div");
+  box.id = "starter";
+  box.style.cssText = "margin-top:auto;display:flex;flex-direction:column;gap:8px";
+  box.innerHTML = '<p style="font-size:13px;text-align:center;color:var(--muted);margin:0 0 2px">Tap to start, or type your own message</p>';
+  const b = document.createElement("button");
+  b.className = "start"; b.textContent = STARTER; b.dir = "auto";
+  b.onclick = () => send(STARTER);
+  box.appendChild(b); log.appendChild(box);
+}
+
+async function send(text){
+  const t = (text || "").trim();
+  if (!t || busy) return;
+  const s = document.getElementById("starter"); if (s) s.remove();
+  $("msg").value = "";
+  bubble("me", t);
+  typing(true);
+  const turns = history.concat([{ role: "user", content: t }]);
+  try{
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ system: buildPrompt(), turns: turns })
+    });
+    if (res.status === 429) throw { code: "rate_limited" };
+    if (!res.ok) throw { code: "http_" + res.status };
+    const out = await res.json();
+    typing(false);
+    if (!out || typeof out.reply !== "string") throw { code: "bad_shape" };
+    (Array.isArray(out.leads) ? out.leads : []).forEach(submitLead);
+    if (out.reply.trim()) bubble("them", out.reply.trim());
+    history = turns.concat([{ role: "assistant", content: out.reply }]);
+  }catch(e){
+    typing(false);
+    const code = e && e.code;
+    if (code === "rate_limited") event("Too many messages at once. Wait a moment and try again.", true);
+    else event("That reply didn't come through. Send it again.", true);
+    $("msg").value = t;
+  }
+}
+
+$("send").onclick = () => send($("msg").value);
+$("msg").addEventListener("keydown", (e) => { if (e.key === "Enter") send($("msg").value); });
+$("mic").onclick = () => {
+  if (busy) return;
+  const s = document.getElementById("starter"); if (s) s.remove();
+  bubble("me", "🎤 Voice message  0:08");
+  setTimeout(() => bubble("them", "Thanks! I can only read text messages right now. Could you type your reply?\n抱歉，我目前只能读取文字信息，请打字回复。\n唔好意思，我暫時只可以睇文字訊息，麻煩你打字回覆。\nممنون! فعلاً فقط می‌تونم پیام‌های متنی رو بخونم. لطفاً جوابتون رو تایپ کنید."), 600);
+};
+$("reset").onclick = () => {
+  history = []; rows = []; emails = []; openEmail = 0;
+  log.innerHTML = ""; $("mailwrap").className = "";
+  renderSheet(-1); renderMail(); starter(); $("msg").value = ""; $("msg").focus();
+};
+
+renderSheet(-1); renderMail(); starter();
+</script>
+</body>
+</html>
