@@ -11,25 +11,71 @@ const OUTPUT_CONTRACT = `
 ## Output format (strict)
 Respond with ONLY a JSON object, no code fences and no text around it:
 {"reply": "<the WhatsApp message to the parent>", "leads": []}
-- "leads" stays empty except in the single turn where the parent confirms their summary (or asks for a person). Then add one object per child: {"parent_name":"","child_full_name":"","child_age":"","date_of_birth":"","gender":"","swim_experience":"","preferred_time_1":"","preferred_time_2":"","preferred_time_3":"","heard_about_us":"","notes":""}
+- "leads" stays empty except in the single turn where the parent confirms their summary (or asks for a person). Then add one object per child: {"kids_total":"","child_number":"","age":"","gender":"","previous_experience":"","availability_1":"","availability_2":"","availability_3":"","notes":""}
 - Never resubmit a lead you already submitted.
 - "reply" is plain WhatsApp text only: never put code, JSON or function calls inside it.`;
 
 let windowStart = Date.now();
 let callsThisWindow = 0;
 
-function parseAgent(raw) {
-  const cleaned = String(raw).replace(/```json|```/g, "").trim();
-  const a = cleaned.indexOf("{");
-  const b = cleaned.lastIndexOf("}");
-  if (a === -1 || b === -1) return null;
-  try {
-    const obj = JSON.parse(cleaned.slice(a, b + 1));
-    if (typeof obj.reply !== "string") return null;
-    return { reply: obj.reply.trim(), leads: Array.isArray(obj.leads) ? obj.leads : [] };
-  } catch {
-    return null;
+function extractJson(raw) {
+  const cleaned = String(raw).replace(/```json/gi, "").replace(/```/g, "").trim();
+  const start = cleaned.indexOf("{");
+  if (start === -1) return null;
+  // Walk the string tracking quotes and escapes so braces inside text don't fool us.
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < cleaned.length; i++) {
+    const c = cleaned[i];
+    if (esc) { esc = false; continue; }
+    if (c === "\\") { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === "{") depth++;
+    else if (c === "}") { depth--; if (depth === 0) return cleaned.slice(start, i + 1); }
   }
+  return cleaned.slice(start); // truncated output: try to repair below
+}
+
+function repair(text) {
+  // Escape raw newlines/tabs that appear inside JSON strings, and close an unterminated tail.
+  let out = "", inStr = false, esc = false;
+  for (const c of text) {
+    if (esc) { out += c; esc = false; continue; }
+    if (c === "\\") { out += c; esc = true; continue; }
+    if (c === '"') { inStr = !inStr; out += c; continue; }
+    if (inStr && c === "\n") { out += "\\n"; continue; }
+    if (inStr && c === "\r") { continue; }
+    if (inStr && c === "\t") { out += "\\t"; continue; }
+    out += c;
+  }
+  if (inStr) out += '"';
+  // Close whatever is still open, innermost first.
+  const stack = []; inStr = false; esc = false;
+  for (const c of out) {
+    if (esc) { esc = false; continue; }
+    if (c === "\\") { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === "{" || c === "[") stack.push(c);
+    else if (c === "}" || c === "]") stack.pop();
+  }
+  out = out.replace(/,\s*$/, "");
+  while (stack.length) out += stack.pop() === "[" ? "]" : "}";
+  return out;
+}
+
+function parseAgent(raw) {
+  const slice = extractJson(raw);
+  if (!slice) return null;
+  for (const candidate of [slice, repair(slice)]) {
+    try {
+      const obj = JSON.parse(candidate);
+      if (typeof obj.reply === "string") {
+        return { reply: obj.reply.trim(), leads: Array.isArray(obj.leads) ? obj.leads : [] };
+      }
+    } catch (_) { /* try the next candidate */ }
+  }
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -51,7 +97,7 @@ export default async function handler(req, res) {
     content: String(t.content || "").slice(0, MAX_CHARS),
   }));
 
-  try {
+  const askAnthropic = async (msgs) => {
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -63,23 +109,44 @@ export default async function handler(req, res) {
         model: MODEL,
         max_tokens: 1000,
         system: system.slice(0, 20000) + OUTPUT_CONTRACT,
-        messages,
+        // Prefilling "{" makes the model continue a JSON object instead of chatting.
+        messages: msgs.concat([{ role: "assistant", content: "{" }]),
       }),
     });
+    const raw = r.ok ? await r.json() : await r.text();
+    return { ok: r.ok, status: r.status, raw };
+  };
 
-    if (r.status === 429) return res.status(429).json({ error: "Rate limited" });
-    if (!r.ok) {
-      const raw = await r.text();
-      console.error("Anthropic error", r.status, raw.slice(0, 500));
-      let msg = "Anthropic returned " + r.status;
-      try { const j = JSON.parse(raw); if (j.error && j.error.message) msg = j.error.message; } catch (_) {}
+  try {
+    let attempt = await askAnthropic(messages);
+
+    if (attempt.status === 429) return res.status(429).json({ error: "Rate limited" });
+    if (!attempt.ok) {
+      console.error("Anthropic error", attempt.status, String(attempt.raw).slice(0, 500));
+      let msg = "Anthropic returned " + attempt.status;
+      try { const j = JSON.parse(attempt.raw); if (j.error && j.error.message) msg = j.error.message; } catch (_) {}
       return res.status(502).json({ error: msg });
     }
 
-    const data = await r.json();
-    const raw = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
-    const parsed = parseAgent(raw);
-    if (!parsed) return res.status(502).json({ error: "Unreadable reply" });
+    const textOf = (d) => "{" + (d.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n");
+
+    let parsed = parseAgent(textOf(attempt.raw));
+
+    if (!parsed) {
+      // One corrective retry before giving up.
+      console.warn("Unparseable first attempt:", textOf(attempt.raw).slice(0, 300));
+      const retryMsgs = messages.concat([{
+        role: "user",
+        content: "Your previous reply was not valid JSON. Reply again to the same message, as a single JSON object only: {\"reply\": \"...\", \"leads\": []}. Escape every newline inside strings as \\n.",
+      }]);
+      attempt = await askAnthropic(retryMsgs);
+      if (attempt.ok) parsed = parseAgent(textOf(attempt.raw));
+    }
+
+    if (!parsed) {
+      console.error("Unparseable after retry");
+      return res.status(502).json({ error: "The assistant replied in an unexpected format. Send the message again." });
+    }
 
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json(parsed);

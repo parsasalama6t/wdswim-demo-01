@@ -3,6 +3,12 @@
 A shareable demo of the WD Swim WhatsApp trial-booking agent. Anyone with the link
 can try it; no Claude account needed. Your API key stays on the server.
 
+**Flow:** how many kids -> per child: age (3-17), gender, previous experience ->
+up to 3 availabilities inside operating hours -> confirm -> lead logged -> a
+receptionist contacts the parent.
+
+**Hours:** Mon-Fri 3:45-9 PM | Sat 9 AM-7 PM | Sun 8:45 AM-5 PM
+
 ## Deploy to Vercel (about 5 minutes)
 
 1. Create a repo and push these files (GitHub, GitLab, whatever you use).
