@@ -1,13 +1,19 @@
 // Visit /api/health in a browser to see why the chat isn't working.
-// Never prints your key — only whether it's present and whether Anthropic accepts it.
+// Sends one real chat turn with exactly the settings the chat uses. Never prints your key.
+
+import { askAgent, errorMessage, MODEL } from "./_agent.js";
+
+// Reuse a passing result for a minute, so reloading this page doesn't spend a chat turn every time.
+let lastOk = null;
 
 export default async function handler(req, res) {
+  res.setHeader("Cache-Control", "no-store");
   const key = process.env.ANTHROPIC_API_KEY;
   const out = {
     keyPresent: Boolean(key),
     keyLooksValid: Boolean(key && key.startsWith("sk-ant-")),
     keyLength: key ? key.length : 0,
-    model: "claude-sonnet-5",
+    model: MODEL,
   };
 
   if (!key) {
@@ -16,47 +22,31 @@ export default async function handler(req, res) {
     return res.status(200).json(out);
   }
 
+  if (lastOk && Date.now() - lastOk.at < 60000) return res.status(200).json(lastOk.body);
+
+  const started = Date.now();
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: out.model,
-        max_tokens: 8,
-        messages: [{ role: "user", content: "Reply with the word ok." }],
-      }),
-    });
-
-    out.anthropicStatus = r.status;
-    if (r.ok) {
-      out.status = "OK";
-      out.fix = "Everything works. The chat should run.";
-      return res.status(200).json(out);
-    }
-
-    const raw = await r.text();
-    try {
-      const j = JSON.parse(raw);
-      out.anthropicError = j.error ? j.error.message : raw.slice(0, 300);
-    } catch (_) {
-      out.anthropicError = raw.slice(0, 300);
-    }
-
-    out.status = "FAIL";
-    if (r.status === 401) out.fix = "The key was rejected. Create a fresh key at console.anthropic.com -> API Keys, update it in Vercel, and redeploy.";
-    else if (r.status === 400) out.fix = "The request was rejected, usually an unknown model name. Check MODEL in api/chat.js against the model list at console.anthropic.com.";
-    else if (r.status === 402 || /credit|balance|quota/i.test(out.anthropicError || "")) out.fix = "Out of API credit. Add credit at console.anthropic.com -> Billing. Note: Claude.ai subscription credit is separate from API credit.";
-    else if (r.status === 429) out.fix = "Rate limited right now. Wait a minute and reload this page.";
-    else out.fix = "See anthropicError above.";
+    const { reply } = await askAgent([{ role: "user", content: "Hi" }]);
+    out.status = "OK";
+    out.ms = Date.now() - started;
+    out.sampleReply = reply.slice(0, 200);
+    out.fix = "Everything works. The chat should run.";
+    lastOk = { at: Date.now(), body: out };
     return res.status(200).json(out);
   } catch (e) {
     out.status = "FAIL";
-    out.anthropicError = e && e.message ? e.message : "unknown";
-    out.fix = "The server could not reach Anthropic at all. Check the Vercel function logs.";
+    out.ms = Date.now() - started;
+    out.anthropicStatus = e?.status;
+    out.anthropicError = errorMessage(e);
+
+    const s = e?.status;
+    if (s === 401) out.fix = "The key was rejected. Create a fresh key at console.anthropic.com -> API Keys, update it in Vercel, and redeploy.";
+    else if (s === 402 || /credit|balance|quota/i.test(out.anthropicError)) out.fix = "Out of API credit. Add credit at console.anthropic.com -> Billing. Note: Claude.ai subscription credit is separate from API credit.";
+    else if (s === 404) out.fix = "Unknown model. Check the ANTHROPIC_MODEL environment variable in Vercel (or MODEL in api/_agent.js).";
+    else if (s === 429) out.fix = "Rate limited right now. Wait a minute and reload this page.";
+    else if (s >= 500) out.fix = "Anthropic is overloaded or having trouble right now. Wait a minute and reload this page.";
+    else if (s) out.fix = "Anthropic rejected the request. See anthropicError above.";
+    else out.fix = "No usable reply from Anthropic. See anthropicError above and the Vercel function logs.";
     return res.status(200).json(out);
   }
 }

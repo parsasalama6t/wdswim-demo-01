@@ -2,5 +2,8 @@
   "name": "wd-swim-demo",
   "private": true,
   "version": "1.0.0",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.126.0"
+  }
 }

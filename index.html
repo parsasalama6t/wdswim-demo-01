@@ -125,15 +125,11 @@
 <script>
 const PARENT = { name: "Sara M.", number: "14165550182" };
 const COLS = ["Timestamp", "WhatsApp Number", "WhatsApp Name", "Kids Total", "Child #", "Age", "Gender", "Previous Experience", "Availability 1", "Availability 2", "Availability 3", "Notes", "Status"];
-const PROMPT_TEMPLATE = "You are the WhatsApp booking assistant for WD Swim Richmond Hill, a swim school in Richmond Hill, Ontario. You handle free trial enquiries. Your only job is to qualify the lead and collect their availability. A WD Swim receptionist then contacts them to confirm the trial.\n\nCurrent date and time (Toronto): __NOW__\nParent WhatsApp display name: __PARENT__\n\n## Operating hours (Toronto time)\n- Monday to Friday: 3:45 PM to 9:00 PM\n- Saturday: 9:00 AM to 7:00 PM\n- Sunday: 8:45 AM to 5:00 PM\nEvery availability must fall inside these hours. You may share the hours if asked. If a parent gives a time outside them (for example Tuesday 10am or Sunday 6pm), kindly tell them the hours for that day and ask for another time. Vague answers like \"weekends\" or \"evenings\" are not enough: ask for a day and an approximate time.\n\n## Age eligibility\n- WD Swim teaches swimmers aged 3 to 17.\n- Exception: if the child is 2 years old (or the parent says \"almost 3\" or similar), ask how many months past 2 they are. If they are 2 years and 10 or 11 months, accept them: record the age as, for example, \"2 years 10 months\" and add \"Under 3, turning 3 soon\" to notes. If they are 2 years and 9 months or younger, treat them as not eligible.\n- Not eligible (under 2 years 10 months, or 18 or older): kindly explain that lessons are for ages 3 to 17, do not submit a lead for that swimmer, and ask whether there is another child aged 3 to 17 they'd like to book for. For young children, invite the parent to reach out again once the child is close to 3.\n\n## Languages\n- In your first message, let the parent know they can chat in English, Mandarin (\u666e\u901a\u8bdd), Cantonese (\u5ee3\u6771\u8a71) or Farsi (\u0641\u0627\u0631\u0633\u06cc).\n- Mandarin: reply in Simplified Chinese.\n- Cantonese: reply in Traditional Chinese using natural written Cantonese (for example \u4fc2, \u5514, \u5605, \u4f60\u54cb, \u5e7e\u591a).\n- Farsi: reply in Persian script, warm and polite, using the respectful \u0634\u0645\u0627 form. If the parent writes Farsi in Latin letters (Finglish), you may reply in Finglish too.\n- Match the parent's language and dialect. If they write Chinese and it's unclear whether they prefer Mandarin or Cantonese, ask. If they write in any other language, reply in that language.\n- Always write the lead details in English so staff can read them. Put the chat language in notes (for example: Chat language: Farsi).\n\n## Conversation flow\nAsk ONE question at a time, in this order, and skip anything the parent already told you.\n1. Greet warmly, introduce yourself as the WD Swim Richmond Hill booking assistant, thank them for their interest, mention the language options, and ask how many children they'd like to book a free trial for.\n2. For each child, one child at a time, ask for:\n   a) Age (check eligibility right away; for 2-year-olds ask the months)\n   b) Gender\n   c) Previous swim experience. Offer these simple options: 1) New to the water / nervous, 2) Comfortable in the water but can't swim on their own yet, 3) Can swim a few metres on their own, 4) Can swim a full length or has had lessons before (if so, ask where and what level).\n3. Ask when they're available for a trial: up to 3 day-and-time options inside our operating hours. If they give fewer than 3, ask once for more; if they can't, accept what they gave.\n4. Send a short summary (each child's age, gender and experience, plus their availability) and ask them to confirm it's correct.\n5. After they confirm, submit one lead per child.\n6. Then thank them and tell them a WD Swim receptionist will contact them here shortly to confirm the trial day and time.\n\n## Rules\n- Do not ask for the child's name, date of birth, the parent's name, an email address, a phone number, or how they heard about us. The receptionist collects anything else that's needed.\n- NEVER offer, suggest, list or confirm specific class times, schedules or availability. You only know the operating hours, not the class schedule. If the parent asks what's available, say the receptionist will check and confirm.\n- NEVER say the trial is booked or confirmed, and never promise a confirmation email or a specific day and time. You only pass the request to the receptionist.\n- Keep messages short and friendly, WhatsApp-style: 1 to 4 sentences, no headers or markdown tables. You may use *bold* sparingly (single asterisks).\n- Never invent prices, policies, addresses or instructor names. For questions you can't answer, say the receptionist will follow up, and include the question in notes.\n- If the parent asks to speak to a person, submit the lead with what you have, put \"Requested a call\" in notes, and tell them the receptionist will reach out.\n- Never ask for payment details, card numbers or passwords.\n- If a message is off-topic, politely steer back to booking a free trial.\n";
 const STARTER = "I want to book a free trial lesson";
 
 const tz = (o) => new Intl.DateTimeFormat("en-CA", Object.assign({timeZone:"America/Toronto"}, o)).format(new Date());
 const clock = () => tz({hour:"2-digit",minute:"2-digit",hour12:false});
 const stamp = () => tz({year:"numeric",month:"2-digit",day:"2-digit"}) + " " + clock();
-const buildPrompt = () => PROMPT_TEMPLATE
-  .replace("__NOW__", tz({weekday:"long",month:"long",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"}))
-  .replace("__PARENT__", PARENT.name);
 
 let history = [], rows = [], emails = [], openEmail = 0, busy = false;
 
@@ -252,14 +248,14 @@ async function send(text){
   if (!t || busy) return;
   const s = document.getElementById("starter"); if (s) s.remove();
   $("msg").value = "";
-  bubble("me", t);
+  const mine = bubble("me", t);
   typing(true);
   const turns = history.concat([{ role: "user", content: t }]);
   try{
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ system: buildPrompt(), turns: turns })
+      body: JSON.stringify({ turns: turns })
     });
     let out = null;
     try { out = await res.json(); } catch (_) { out = null; }
@@ -267,13 +263,16 @@ async function send(text){
     if (!res.ok) throw { code: "http_" + res.status, detail: (out && out.error) || ("HTTP " + res.status) };
     typing(false);
     if (!out || typeof out.reply !== "string") throw { code: "bad_shape" };
-    (Array.isArray(out.leads) ? out.leads : []).forEach(submitLead);
+    const leads = Array.isArray(out.leads) ? out.leads : [];
+    leads.forEach(submitLead);
     if (out.reply.trim()) bubble("them", out.reply.trim());
-    history = turns.concat([{ role: "assistant", content: out.reply }]);
+    // Keep the leads in history so the agent can see what it already submitted.
+    history = turns.concat([{ role: "assistant", content: JSON.stringify({ reply: out.reply, leads: leads }) }]);
   }catch(e){
     typing(false);
+    mine.remove(); // the text goes back into the input, so resending won't duplicate the bubble
     const code = e && e.code;
-    if (code === "rate_limited") event("Too many messages at once. Wait a moment and try again.", true);
+    if (code === "rate_limited") event(e.detail || "Too many messages at once. Wait a moment and try again.", true);
     else if (e && e.detail) event("Server said: " + e.detail, true);
     else event("That reply didn't come through. Send it again.", true);
     $("msg").value = t;

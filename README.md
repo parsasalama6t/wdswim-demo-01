@@ -19,41 +19,48 @@ receptionist contacts the parent.
 4. Deploy. You get a URL like `wd-swim-demo.vercel.app`.
 5. Optional: **Settings → Domains** to point your own domain at it.
 
-No build step, no dependencies to install.
+No build step. Vercel installs the one dependency (the Anthropic SDK) on its own.
 
 ## Deploy to Netlify instead
 
 Same idea, two changes:
-- Move `api/chat.js` to `netlify/functions/chat.js`
+- Move `api/chat.js` and `api/_agent.js` to `netlify/functions/`
 - In `index.html`, change `fetch("/api/chat"` to `fetch("/.netlify/functions/chat"`
 
 Then set `ANTHROPIC_API_KEY` under Site settings → Environment variables.
 
 ## If the chat says an error
 
-Open `https://YOUR-SITE.vercel.app/api/health` in a browser. It tells you exactly
-what's wrong and how to fix it, without ever printing your key. The usual causes:
+Open `https://YOUR-SITE.vercel.app/api/health` in a browser. It sends one real chat
+turn with the same settings the chat uses, so if it says OK the chat works. If not, it
+tells you what's wrong and how to fix it, without ever printing your key. The usual causes:
 
 - **ANTHROPIC_API_KEY not set**, or set after the last deploy. Environment variables
   only apply to *new* deployments, so redeploy after adding it.
 - **Key rejected (401).** Make a fresh key at console.anthropic.com -> API Keys.
 - **No API credit.** Claude.ai subscription credit is separate from API credit;
   add credit under console.anthropic.com -> Billing.
+- **Unknown model (404).** Check the `ANTHROPIC_MODEL` environment variable, if you set one.
 
 ## Cost
 
-Each full conversation runs roughly $0.08–0.12 on Claude Sonnet 5, so $5 of credit
-covers about 40–60 demo runs. To stretch it further, change `MODEL` in
-`api/chat.js` to `claude-haiku-4-5-20251001` — roughly half the cost, slightly
-less polished replies.
+A chat turn costs about $0.007 on Claude Sonnet 5 (measured), so a full booking runs
+roughly $0.05–0.10 and $5 of credit covers about 50–100 demo runs.
+
+Two settings trade cost and speed against quality:
+- `EFFORT` in `api/_agent.js` (`"medium"` by default): `"low"` replies faster and
+  cheaper, `"high"` follows the rules more strictly but replies slower.
+- The model: set the `ANTHROPIC_MODEL` environment variable in Vercel and redeploy,
+  for example `claude-opus-5` for the smartest replies at about 2.5x the cost. The
+  model must support adaptive thinking and structured outputs, so Haiku 4.5 won't work.
 
 `api/chat.js` caps the demo at 400 calls a day so a shared link can't quietly
 drain your credit. Change `DAILY_CALL_CAP` if you need more.
 
 ## Keeping it in sync
 
-The demo's behaviour lives in the system prompt inside `index.html`
-(`PROMPT_TEMPLATE`). It mirrors the n8n agent's prompt. When the real agent
+The demo's behaviour lives in the system prompt inside `api/_agent.js`
+(`SYSTEM_TEMPLATE`). It mirrors the n8n agent's prompt. When the real agent
 changes, update both so the demo doesn't promise something the live agent won't do.
 
 ## Notes
