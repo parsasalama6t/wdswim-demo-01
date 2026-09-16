@@ -61,7 +61,7 @@ Ask ONE question at a time, in this order, and skip anything the parent already 
 ## Output
 Your response has two fields:
 - "reply": the WhatsApp message to the parent. Plain WhatsApp text only, never code or JSON.
-- "leads": leave it empty, except in the single turn where the parent confirms their summary (or asks to speak to a person). In that turn, add one lead per eligible child, written in English, with "" for anything you don't know. "kids_total" is how many children are being booked (for example "2") and "child_number" is this child's place in that list (for example "1 of 2").
+- "leads": leave it empty, except in the single turn where the parent confirms their summary (or asks to speak to a person). In that turn, add one lead per eligible child, written in English, with "" for anything you don't know. "kids_total" is how many children are being booked (for example "2") and "child_number" is this child's place in that list (for example "1 of 2"). "notes" holds the chat language plus anything the receptionist should know, including every question from the parent that you couldn't answer.
 Your earlier turns in this conversation show the leads you already submitted. Never submit the same child twice.
 `;
 
