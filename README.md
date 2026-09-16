@@ -3,7 +3,7 @@
 A shareable demo of the WD Swim WhatsApp trial-booking agent. Anyone with the link
 can try it; no Claude account needed. Your API key stays on the server.
 
-**Flow:** how many kids -> per child: age (3-17), gender, previous experience ->
+**Flow:** how many kids -> per child: name, age (3-17) and gender in one message, then previous experience ->
 up to 3 availabilities inside operating hours -> confirm -> lead logged -> a
 receptionist contacts the parent.
 
@@ -44,12 +44,12 @@ tells you what's wrong and how to fix it, without ever printing your key. The us
 
 ## Cost
 
-A chat turn costs about $0.007 on Claude Sonnet 5 (measured), so a full booking runs
-roughly $0.05–0.10 and $5 of credit covers about 50–100 demo runs.
+A chat turn costs roughly a cent on Claude Sonnet 5, so a full booking runs
+roughly $0.05–0.12 and $5 of credit covers about 40–100 demo runs.
 
 Two settings trade cost and speed against quality:
-- `EFFORT` in `api/_agent.js` (`"medium"` by default): `"low"` replies faster and
-  cheaper, `"high"` follows the rules more strictly but replies slower.
+- `EFFORT` in `api/_agent.js` (`"high"` by default): `"medium"` or `"low"` reply a bit
+  faster and cheaper, but slip more often on details such as asking only for what's missing.
 - The model: set the `ANTHROPIC_MODEL` environment variable in Vercel and redeploy,
   for example `claude-opus-5` for the smartest replies at about 2.5x the cost. The
   model must support adaptive thinking and structured outputs, so Haiku 4.5 won't work.

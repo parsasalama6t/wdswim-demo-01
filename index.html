@@ -124,7 +124,7 @@
 
 <script>
 const PARENT = { name: "Sara M.", number: "14165550182" };
-const COLS = ["Timestamp", "WhatsApp Number", "WhatsApp Name", "Kids Total", "Child #", "Age", "Gender", "Previous Experience", "Availability 1", "Availability 2", "Availability 3", "Notes", "Status"];
+const COLS = ["Timestamp", "WhatsApp Number", "WhatsApp Name", "Kids Total", "Child #", "Child Name", "Age", "Gender", "Previous Experience", "Availability 1", "Availability 2", "Availability 3", "Notes", "Status"];
 const STARTER = "I want to book a free trial lesson";
 
 const tz = (o) => new Intl.DateTimeFormat("en-CA", Object.assign({timeZone:"America/Toronto"}, o)).format(new Date());
@@ -201,6 +201,7 @@ function submitLead(i){
     "WhatsApp Name": PARENT.name,
     "Kids Total": i.kids_total || "",
     "Child #": i.child_number || "",
+    "Child Name": i.child_name || "",
     "Age": i.age || "",
     "Gender": i.gender || "",
     "Previous Experience": i.previous_experience || "",
@@ -215,6 +216,7 @@ function submitLead(i){
   const summary = [
     "Kids total: " + (row["Kids Total"] || "1"),
     "Child: " + (row["Child #"] || "1 of 1"),
+    "Name: " + (row["Child Name"] || "-"),
     "Age: " + row["Age"],
     "Gender: " + (row["Gender"] || "-"),
     "Previous experience: " + row["Previous Experience"],
@@ -224,12 +226,12 @@ function submitLead(i){
     "Notes: " + (row["Notes"] || "-")
   ].join("\n");
   emails.unshift({
-    subject: "New WhatsApp free trial lead: age " + (row["Age"] || "?") + " (" + PARENT.name + ")",
+    subject: "New WhatsApp free trial lead: " + (row["Child Name"] || "child") + ", age " + (row["Age"] || "?") + " (" + PARENT.name + ")",
     time: clock(),
     body: "New free trial lead from WhatsApp - please contact them to confirm a trial time and book it in iClassPro.\n\nParent WhatsApp: +" + PARENT.number + " (" + PARENT.name + ")\n\n" + summary + "\n\nThis lead is also in the Trial Leads tab of the WD Swim Trial Leads sheet."
   });
   openEmail = 0; renderMail();
-  event("Lead saved to sheet and emailed to staff: child " + (row["Child #"] || "1 of 1"));
+  event("Lead saved to sheet and emailed to staff: " + (row["Child Name"] ? row["Child Name"] + ", " : "") + "child " + (row["Child #"] || "1 of 1"));
 }
 
 function starter(){
