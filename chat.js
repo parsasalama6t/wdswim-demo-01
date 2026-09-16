@@ -34,7 +34,7 @@ function parseAgent(raw) {
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
-  if (!process.env.ANTHROPIC_API_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY is not set" });
+  if (!process.env.ANTHROPIC_API_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY is not set in Vercel. Add it under Settings -> Environment Variables, then redeploy." });
 
   // Reset the spend guard every 24h
   if (Date.now() - windowStart > 86400000) { windowStart = Date.now(); callsThisWindow = 0; }
@@ -69,9 +69,11 @@ export default async function handler(req, res) {
 
     if (r.status === 429) return res.status(429).json({ error: "Rate limited" });
     if (!r.ok) {
-      const detail = await r.text();
-      console.error("Anthropic error", r.status, detail.slice(0, 500));
-      return res.status(502).json({ error: "Upstream error" });
+      const raw = await r.text();
+      console.error("Anthropic error", r.status, raw.slice(0, 500));
+      let msg = "Anthropic returned " + r.status;
+      try { const j = JSON.parse(raw); if (j.error && j.error.message) msg = j.error.message; } catch (_) {}
+      return res.status(502).json({ error: msg });
     }
 
     const data = await r.json();
@@ -83,6 +85,6 @@ export default async function handler(req, res) {
     return res.status(200).json(parsed);
   } catch (e) {
     console.error(e);
-    return res.status(502).json({ error: "Request failed" });
+    return res.status(502).json({ error: "Could not reach Anthropic: " + (e && e.message ? e.message : "unknown error") });
   }
 }

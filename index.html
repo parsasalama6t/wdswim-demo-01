@@ -265,9 +265,10 @@ async function send(text){
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ system: buildPrompt(), turns: turns })
     });
-    if (res.status === 429) throw { code: "rate_limited" };
-    if (!res.ok) throw { code: "http_" + res.status };
-    const out = await res.json();
+    let out = null;
+    try { out = await res.json(); } catch (_) { out = null; }
+    if (res.status === 429) throw { code: "rate_limited", detail: out && out.error };
+    if (!res.ok) throw { code: "http_" + res.status, detail: (out && out.error) || ("HTTP " + res.status) };
     typing(false);
     if (!out || typeof out.reply !== "string") throw { code: "bad_shape" };
     (Array.isArray(out.leads) ? out.leads : []).forEach(submitLead);
@@ -277,6 +278,7 @@ async function send(text){
     typing(false);
     const code = e && e.code;
     if (code === "rate_limited") event("Too many messages at once. Wait a moment and try again.", true);
+    else if (e && e.detail) event("Server said: " + e.detail, true);
     else event("That reply didn't come through. Send it again.", true);
     $("msg").value = t;
   }

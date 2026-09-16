@@ -23,6 +23,17 @@ Same idea, two changes:
 
 Then set `ANTHROPIC_API_KEY` under Site settings → Environment variables.
 
+## If the chat says an error
+
+Open `https://YOUR-SITE.vercel.app/api/health` in a browser. It tells you exactly
+what's wrong and how to fix it, without ever printing your key. The usual causes:
+
+- **ANTHROPIC_API_KEY not set**, or set after the last deploy. Environment variables
+  only apply to *new* deployments, so redeploy after adding it.
+- **Key rejected (401).** Make a fresh key at console.anthropic.com -> API Keys.
+- **No API credit.** Claude.ai subscription credit is separate from API credit;
+  add credit under console.anthropic.com -> Billing.
+
 ## Cost
 
 Each full conversation runs roughly $0.08–0.12 on Claude Sonnet 5, so $5 of credit
